@@ -17,7 +17,6 @@
 }
 
 * { box-sizing: border-box; }
-
 html { scroll-behavior: smooth; }
 
 body {
@@ -27,11 +26,8 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-
 button { cursor: pointer; }
-
 button:disabled { opacity: .6; cursor: not-allowed; }
-
 .app-shell { min-height: 100vh; overflow: hidden; }
 
 .top-strip {
@@ -110,6 +106,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: block;
 }
 
 .menu-toggle { display: none; }
@@ -145,7 +142,6 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 .outline:hover { border-color: var(--cyan); color: var(--cyan); }
 
 .small { min-height: 37px; padding: 8px 13px; }
-
 .full { width: 100%; margin-top: 9px; }
 
 .notice {
@@ -359,7 +355,6 @@ select, input, textarea {
 }
 
 select:focus, input:focus, textarea:focus { border-color: var(--blue); }
-
 .catalog-tools select { height: 43px; font-size: 12px; }
 
 .active-filter {
@@ -489,7 +484,6 @@ form label {
 
 form input, form textarea { width: 100%; }
 form textarea { min-height: 85px; resize: vertical; }
-
 form .check { flex-direction: row; align-items: center; }
 form .check input { width: auto; }
 
@@ -602,7 +596,14 @@ footer small { color: #74849c; font-size: 10px; }
   .topbar nav.nav-open { display: flex; }
   .topbar nav button { padding: 12px; text-align: left; }
   .head-actions { gap: 5px; }
-  .user-email { display: none; }
+  .user-email {
+    display: block;
+    max-width: 150px;
+    font-size: 10px;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+  }
   .head-actions .outline { font-size: 10px; padding: 8px; }
   .hero { min-height: auto; padding: 48px 6%; }
   .hero h1 { font-size: 37px; }
