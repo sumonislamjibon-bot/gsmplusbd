@@ -266,6 +266,13 @@ export default function App() {
 
         <nav className={mobileMenu ? "nav-open" : ""}>
           <button onClick={() => {setTab("home");setMobileMenu(false);}}>হোম</button>
+
+          {session && (
+            <button onClick={() => {setTab("dashboard");setMobileMenu(false);}}>
+              ড্যাশবোর্ড
+            </button>
+          )}
+
           <button onClick={() => {setTab("packages");setMobileMenu(false);}}>প্যাকেজ</button>
           <button onClick={() => {setTab("orders");setMobileMenu(false);}}>আমার অর্ডার</button>
           {isAdmin && (
@@ -493,6 +500,57 @@ export default function App() {
           <button className="text-button" onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}>
             {authMode === "login" ? "নতুন অ্যাকাউন্ট খুলুন" : "আগে থেকেই অ্যাকাউন্ট আছে? লগইন"}
           </button>
+        </section>
+      )}
+
+      {tab === "dashboard" && session && (
+        <section className="section page-section">
+          <div className="section-title">
+            <div className="eyebrow">MY ACCOUNT</div>
+            <h2>আমার ড্যাশবোর্ড</h2>
+            <p>আপনার GSMPLUS অ্যাকাউন্টের তথ্য</p>
+          </div>
+
+          <div className="feature-grid">
+            <div className="feature-card">
+              <h3>নাম</h3>
+              <p>
+                {profile?.full_name ||
+                  session.user.user_metadata?.full_name ||
+                  "নাম দেওয়া হয়নি"}
+              </p>
+            </div>
+
+            <div className="feature-card">
+              <h3>ইমেইল</h3>
+              <p>{session.user.email}</p>
+            </div>
+
+            <div className="feature-card">
+              <h3>মোবাইল নম্বর</h3>
+              <p>
+                {profile?.mobile ||
+                  session.user.user_metadata?.mobile ||
+                  "মোবাইল দেওয়া হয়নি"}
+              </p>
+            </div>
+
+            <div className="feature-card">
+              <h3>অ্যাকাউন্টের ধরন</h3>
+              <p>{isAdmin ? "Admin" : "সাধারণ সদস্য"}</p>
+            </div>
+          </div>
+
+          <div className="panel" style={{ marginTop: "20px" }}>
+            <h3>আমার অর্ডার</h3>
+            <p>মোট অর্ডার: {orders.length}</p>
+            <button
+              className="outline"
+              onClick={() => setTab("orders")}
+            >
+              আমার অর্ডার দেখুন
+            </button>
+          </div>
         </section>
       )}
 
