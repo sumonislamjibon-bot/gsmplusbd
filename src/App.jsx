@@ -6,14 +6,20 @@ import {
   ShieldCheck, Cpu, X, RefreshCw, Clock3, HardDrive,
   PackageCheck, ChevronRight, Menu, User, Bell,
   FileQuestion, Store, Save, Send, CheckCircle,
-  AlertCircle
+  AlertCircle, ExternalLink, Link2
 } from "lucide-react";
 
 const money = n => `৳${Number(n || 0).toLocaleString("en-US")}`;
 
 const brands = [
-  "All Brands", "Samsung", "Xiaomi", "Redmi", "Vivo",
-  "OPPO", "Realme", "Tecno", "Infinix", "Itel", "Motorola"
+  "All Brands", "Samsung", "Xiaomi", "Redmi", "POCO",
+  "Vivo", "iQOO", "OPPO", "Realme", "OnePlus",
+  "Tecno", "Infinix", "Itel", "Motorola", "Nokia",
+  "Google Pixel", "Huawei", "Honor", "iPhone",
+  "Asus", "Lenovo", "LG", "Sony", "Nothing",
+  "CMF", "Walton", "Symphony", "Lava", "Benco",
+  "Meizu", "ZTE", "Nubia", "BlackBerry", "Doogee",
+  "UMIDIGI", "Philips", "Sharp", "Amazon", "Various Brands"
 ];
 
 const statusText = status => ({
@@ -53,9 +59,9 @@ export default function App() {
 
   const [form, setForm] = useState({
     title: "", brand: "", model: "", version: "",
-    price: "0", description: "", is_free: true
+    price: "0", description: "", is_free: true,
+    download_url: ""
   });
-  const [file, setFile] = useState(null);
 
   const [requestForm, setRequestForm] = useState({
     brand: "", model: "", details: ""
@@ -85,6 +91,7 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return;
+
     loadFirmware();
     loadAnnouncements();
 
@@ -101,9 +108,7 @@ export default function App() {
   const isAdmin = profile?.role === "admin";
 
   useEffect(() => {
-    if (isAdmin) {
-      loadAdminData();
-    }
+    if (isAdmin) loadAdminData();
   }, [isAdmin]);
 
   async function loadFirmware() {
@@ -137,6 +142,7 @@ export default function App() {
       .maybeSingle();
 
     if (profileError) setNotice(profileError.message);
+
     setProfile(p || null);
 
     setProfileForm({
@@ -165,6 +171,7 @@ export default function App() {
 
     if (!error) {
       setMyApplication(data || null);
+
       if (data) {
         setResellerForm({
           business_name: data.business_name || "",
@@ -176,28 +183,32 @@ export default function App() {
   }
 
   async function loadAdminData() {
-    const [orderResult, requestResult, applicationResult, announcementResult] =
-      await Promise.all([
-        supabase
-          .from("orders")
-          .select("*, profiles!orders_user_id_profiles_fkey(full_name,email), firmwares(title)")
-          .order("created_at", { ascending: false }),
+    const [
+      orderResult,
+      requestResult,
+      applicationResult,
+      announcementResult
+    ] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("*, profiles!orders_user_id_profiles_fkey(full_name,email), firmwares(title)")
+        .order("created_at", { ascending: false }),
 
-        supabase
-          .from("firmware_requests")
-          .select("*")
-          .order("created_at", { ascending: false }),
+      supabase
+        .from("firmware_requests")
+        .select("*")
+        .order("created_at", { ascending: false }),
 
-        supabase
-          .from("reseller_applications")
-          .select("*")
-          .order("created_at", { ascending: false }),
+      supabase
+        .from("reseller_applications")
+        .select("*")
+        .order("created_at", { ascending: false }),
 
-        supabase
-          .from("announcements")
-          .select("*")
-          .order("created_at", { ascending: false })
-      ]);
+      supabase
+        .from("announcements")
+        .select("*")
+        .order("created_at", { ascending: false })
+    ]);
 
     if (orderResult.error) setNotice(orderResult.error.message);
     else setOrders(orderResult.data || []);
@@ -219,6 +230,7 @@ export default function App() {
         .join(" ").toLowerCase();
 
       const matchesSearch = text.includes(search.toLowerCase());
+
       const matchesBrand =
         brand === "All Brands" ||
         (f.brand || "").toLowerCase() === brand.toLowerCase();
@@ -256,6 +268,7 @@ export default function App() {
         });
 
         if (error) throw error;
+
         setNotice("রেজিস্ট্রেশন হয়েছে। ইমেইল কনফার্ম করুন।");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -306,6 +319,7 @@ export default function App() {
         full_name: profileForm.full_name,
         mobile: profileForm.mobile
       });
+
       setNotice("প্রোফাইল আপডেট হয়েছে।");
     }
 
@@ -340,19 +354,57 @@ export default function App() {
       }
     }
 
-    const { data, error } = await supabase.storage
-      .from("firmware-files")
-      .createSignedUrl(f.storage_path, 90);
+    // নতুন External Download Link
+    if (f.download_url) {
+      try {
+        const url = new URL(f.download_url);
 
-    if (error) setNotice(error.message);
-    else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+        if (url.protocol !== "https:") {
+          throw new Error("নিরাপত্তার জন্য HTTPS Download Link ব্যবহার করুন।");
+        }
+
+        window.open(url.href, "_blank", "noopener,noreferrer");
+        return;
+      } catch (error) {
+        setNotice(error.message || "Download Link সঠিক নয়।");
+        return;
+      }
+    }
+
+    // পুরোনো Supabase Storage ফাইলের জন্য
+    if (f.storage_path) {
+      const { data, error } = await supabase.storage
+        .from("firmware-files")
+        .createSignedUrl(f.storage_path, 90);
+
+      if (error) setNotice(error.message);
+      else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+
+      return;
+    }
+
+    setNotice("এই Firmware-এর Download Link এখনো যোগ করা হয়নি।");
   }
 
   async function addFirmware(e) {
     e.preventDefault();
 
-    if (!file) {
-      setNotice("প্রথমে Firmware ফাইল নির্বাচন করুন।");
+    if (!form.download_url.trim()) {
+      setNotice("Firmware Download Link দিন।");
+      return;
+    }
+
+    let downloadUrl;
+
+    try {
+      downloadUrl = new URL(form.download_url.trim());
+
+      if (downloadUrl.protocol !== "https:") {
+        setNotice("HTTPS Download Link ব্যবহার করুন।");
+        return;
+      }
+    } catch {
+      setNotice("সঠিক Download Link দিন।");
       return;
     }
 
@@ -360,25 +412,15 @@ export default function App() {
     setNotice("");
 
     try {
-      const safeName =
-        `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const path = `${session.user.id}/${safeName}`;
-
-      const upload = await supabase.storage
-        .from("firmware-files")
-        .upload(path, file, { upsert: false });
-
-      if (upload.error) throw upload.error;
-
       const { error } = await supabase.from("firmwares").insert({
-        title: form.title,
-        brand: form.brand,
-        model: form.model,
-        version: form.version,
+        title: form.title.trim(),
+        brand: form.brand.trim(),
+        model: form.model.trim(),
+        version: form.version.trim(),
         price: form.is_free ? 0 : Number(form.price),
         is_free: form.is_free,
         description: form.description,
-        storage_path: path,
+        download_url: downloadUrl.href,
         uploaded_by: session.user.id,
         published: true
       });
@@ -387,11 +429,11 @@ export default function App() {
 
       setForm({
         title: "", brand: "", model: "", version: "",
-        price: "0", description: "", is_free: true
+        price: "0", description: "", is_free: true,
+        download_url: ""
       });
-      setFile(null);
 
-      setNotice("Firmware সফলভাবে আপলোড হয়েছে।");
+      setNotice("Firmware সফলভাবে যোগ হয়েছে।");
       await loadFirmware();
     } catch (error) {
       setNotice(error.message);
@@ -552,6 +594,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+
       <div className="top-strip">
         <span>GSMPLUS FIRMWARE DOWNLOAD CENTER</span>
         <span>বাংলাদেশের জন্য Firmware Portal</span>
@@ -563,12 +606,17 @@ export default function App() {
           goTo("home");
         }}>
           <span className="brand-icon"><Smartphone size={24}/></span>
-          <span>GSM<span className="accent">PLUS</span>
+          <span>
+            GSM<span className="accent">PLUS</span>
             <small>REPAIR • FLASH • UPDATE</small>
+            <small>Admin: GSMSUMON</small>
           </span>
         </a>
 
-        <button className="menu-toggle" onClick={() => setMobileMenu(!mobileMenu)}>
+        <button
+          className="menu-toggle"
+          onClick={() => setMobileMenu(!mobileMenu)}
+        >
           {mobileMenu ? <X/> : <Menu/>}
         </button>
 
@@ -579,11 +627,14 @@ export default function App() {
           <button onClick={() => goTo("request")}>Firmware Request</button>
           <button onClick={() => goTo("reseller")}>Reseller</button>
           <button onClick={() => goTo("orders")}>আমার অর্ডার</button>
+
           {isAdmin && (
             <button onClick={() => {
               goTo("admin");
               loadAdminData();
-            }}>অ্যাডমিন</button>
+            }}>
+              অ্যাডমিন
+            </button>
           )}
         </nav>
 
@@ -613,6 +664,7 @@ export default function App() {
       {announcements.length > 0 && (
         <section className="section announcement-strip">
           <div className="eyebrow"><Bell size={15}/> GSMPLUS ঘোষণা</div>
+
           {announcements.slice(0, 3).map(item => (
             <div className="announcement-item" key={item.id}>
               <b>{item.title}</b>
@@ -626,22 +678,37 @@ export default function App() {
         <>
           <section className="hero">
             <div className="hero-content">
-              <div className="eyebrow"><Cpu size={15}/> SMARTPHONE FIRMWARE PORTAL</div>
-              <h1>আপনার ফোনের জন্য<br/><span>সঠিক Firmware</span></h1>
+              <div className="eyebrow">
+                <Cpu size={15}/> SMARTPHONE FIRMWARE PORTAL
+              </div>
+
+              <h1>
+                আপনার ফোনের জন্য<br/>
+                <span>সঠিক Firmware</span>
+              </h1>
+
               <p>
                 বিশ্বস্ত ফার্মওয়্যার, সহজ সার্চ এবং নিরাপদ ডাউনলোড।
                 আপনার মোবাইল সার্ভিসিংয়ের প্রয়োজনীয় সবকিছু এক জায়গায়।
               </p>
-              <button className="primary" onClick={() =>
-                document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" })
-              }>
+
+              <button
+                className="primary"
+                onClick={() =>
+                  document.getElementById("catalog")?.scrollIntoView({
+                    behavior: "smooth"
+                  })
+                }
+              >
                 Firmware খুঁজুন <ChevronRight size={18}/>
               </button>
+
               <div className="hero-points">
                 <span><ShieldCheck size={16}/> নিরাপদ ডাউনলোড</span>
                 <span><PackageCheck size={16}/> Free Firmware</span>
               </div>
             </div>
+
             <div className="hero-art">
               <div className="hero-device">
                 <Smartphone size={105}/>
@@ -662,6 +729,7 @@ export default function App() {
               <div className="eyebrow">BROWSE BY BRAND</div>
               <h2>আপনার ফোনের ব্র্যান্ড নির্বাচন করুন</h2>
             </div>
+
             <div className="brand-list">
               {brands.map(b => (
                 <button
@@ -669,9 +737,13 @@ export default function App() {
                   className={brand === b ? "brand-chip active" : "brand-chip"}
                   onClick={() => {
                     setBrand(b);
-                    document.getElementById("catalog")?.scrollIntoView({ behavior: "smooth" });
+                    document.getElementById("catalog")?.scrollIntoView({
+                      behavior: "smooth"
+                    });
                   }}
-                >{b}</button>
+                >
+                  {b}
+                </button>
               ))}
             </div>
           </section>
@@ -683,6 +755,7 @@ export default function App() {
                 <h2>Firmware Catalog</h2>
                 <p>ব্র্যান্ড, মডেল অথবা ভার্সন দিয়ে খুঁজুন।</p>
               </div>
+
               <div className="catalog-tools">
                 <div className="search">
                   <Search size={18}/>
@@ -692,6 +765,7 @@ export default function App() {
                     placeholder="Samsung A12 খুঁজুন..."
                   />
                 </div>
+
                 <select value={sort} onChange={e => setSort(e.target.value)}>
                   <option value="new">নতুন আগে</option>
                   <option value="old">পুরোনো আগে</option>
@@ -714,19 +788,37 @@ export default function App() {
                       {f.is_free ? "FREE" : money(f.price)}
                     </span>
                   </div>
+
                   <div className="firmware-icon"><Smartphone size={30}/></div>
+
                   <h3>{f.title}</h3>
-                  <p className="muted">{f.model} {f.version && `• ${f.version}`}</p>
+
+                  <p className="muted">
+                    {f.model} {f.version && `• ${f.version}`}
+                  </p>
+
                   <p>{f.description || "Firmware details এখানে দেখুন।"}</p>
-                  <button className="outline full" onClick={() => setSelected(f)}>
+
+                  <button
+                    className="outline full"
+                    onClick={() => setSelected(f)}
+                  >
                     বিস্তারিত দেখুন
                   </button>
-                  <button className="primary full" onClick={() => downloadFirmware(f)}>
+
+                  <button
+                    className="primary full"
+                    onClick={() => downloadFirmware(f)}
+                  >
                     {f.is_free ? "ডাউনলোড করুন" : "Premium Download"}
                     <Download size={16}/>
                   </button>
+
                   {isAdmin && (
-                    <button className="reject full" onClick={() => hideFirmware(f.id)}>
+                    <button
+                      className="reject full"
+                      onClick={() => hideFirmware(f.id)}
+                    >
                       Catalog থেকে সরান
                     </button>
                   )}
@@ -738,7 +830,7 @@ export default function App() {
               <div className="empty">
                 <Cpu size={40}/>
                 <h3>এখনো কোনো Firmware পাওয়া যায়নি</h3>
-                <p>অ্যাডমিন নতুন Firmware আপলোড করলে এখানে দেখা যাবে।</p>
+                <p>অ্যাডমিন নতুন Firmware যোগ করলে এখানে দেখা যাবে।</p>
               </div>
             )}
           </section>
@@ -748,10 +840,25 @@ export default function App() {
               <div className="eyebrow">WHY GSMPLUS</div>
               <h2>GSMPLUS-এর সুবিধা</h2>
             </div>
+
             <div className="feature-grid">
-              <div className="feature-card"><ShieldCheck/><h3>নিরাপদ ডাউনলোড</h3><p>সুরক্ষিত ফাইল লিংকের মাধ্যমে ডাউনলোড।</p></div>
-              <div className="feature-card"><Search/><h3>সহজ সার্চ</h3><p>ব্র্যান্ড, মডেল ও ভার্সন দিয়ে Firmware খুঁজুন।</p></div>
-              <div className="feature-card"><Clock3/><h3>নতুন আপডেট</h3><p>সর্বশেষ আপলোড করা Firmware এক জায়গায়।</p></div>
+              <div className="feature-card">
+                <ShieldCheck/>
+                <h3>নিরাপদ ডাউনলোড</h3>
+                <p>সুরক্ষিত ফাইল লিংকের মাধ্যমে ডাউনলোড।</p>
+              </div>
+
+              <div className="feature-card">
+                <Search/>
+                <h3>সহজ সার্চ</h3>
+                <p>ব্র্যান্ড, মডেল ও ভার্সন দিয়ে Firmware খুঁজুন।</p>
+              </div>
+
+              <div className="feature-card">
+                <Clock3/>
+                <h3>নতুন আপডেট</h3>
+                <p>সর্বশেষ আপলোড করা Firmware এক জায়গায়।</p>
+              </div>
             </div>
           </section>
         </>
@@ -772,7 +879,12 @@ export default function App() {
               <h3>৳০</h3>
               <p>ফ্রি Firmware ডাউনলোড</p>
               <p>সাধারণ User Account</p>
-              <button className="outline full" onClick={() => goTo("account")}>অ্যাকাউন্ট খুলুন</button>
+              <button
+                className="outline full"
+                onClick={() => goTo("account")}
+              >
+                অ্যাকাউন্ট খুলুন
+              </button>
             </div>
 
             <div className="package-card popular">
@@ -781,7 +893,12 @@ export default function App() {
               <h3>শিগগিরই আসছে</h3>
               <p>Premium Firmware Access</p>
               <p>দ্রুত Download সুবিধা</p>
-              <button className="primary full" onClick={() => setNotice("Premium পেমেন্ট ব্যবস্থা পরে চালু হবে।")}>Coming Soon</button>
+              <button
+                className="primary full"
+                onClick={() => setNotice("Premium পেমেন্ট ব্যবস্থা পরে চালু হবে।")}
+              >
+                Coming Soon
+              </button>
             </div>
 
             <div className="package-card">
@@ -790,13 +907,22 @@ export default function App() {
               <h3>শিগগিরই আসছে</h3>
               <p>Technician সুবিধা</p>
               <p>বিশেষ Download Access</p>
-              <button className="outline full" onClick={() => goTo("reseller")}>আবেদন করুন</button>
+              <button
+                className="outline full"
+                onClick={() => goTo("reseller")}
+              >
+                আবেদন করুন
+              </button>
             </div>
           </div>
 
           <div className="payment-placeholder">
             <h3>Payment Methods</h3>
-            <p>এই পেমেন্ট মাধ্যমগুলো ভবিষ্যতে চালু করা হবে। এখন কোনো টাকা পাঠাবেন না।</p>
+            <p>
+              এই পেমেন্ট মাধ্যমগুলো ভবিষ্যতে চালু করা হবে।
+              এখন কোনো টাকা পাঠাবেন না।
+            </p>
+
             <div className="payment-methods">
               <span className="bkash">bKash</span>
               <span className="nagad">Nagad</span>
@@ -809,20 +935,71 @@ export default function App() {
       {tab === "account" && (
         <section className="panel narrow page-section">
           <div className="eyebrow">CUSTOMER ACCOUNT</div>
-          <h2>{authMode === "login" ? "লগইন করুন" : "নতুন অ্যাকাউন্ট খুলুন"}</h2>
+
+          <h2>
+            {authMode === "login" ? "লগইন করুন" : "নতুন অ্যাকাউন্ট খুলুন"}
+          </h2>
+
           <form onSubmit={authenticate}>
-            {authMode === "signup" && <>
-              <label>আপনার নাম<input required value={fullName} onChange={e => setFullName(e.target.value)}/></label>
-              <label>মোবাইল নম্বর<input value={mobile} onChange={e => setMobile(e.target.value)} placeholder="01XXXXXXXXX"/></label>
-            </>}
-            <label>ইমেইল<input type="email" required value={email} onChange={e => setEmail(e.target.value)}/></label>
-            <label>পাসওয়ার্ড<input type="password" minLength="6" required value={password} onChange={e => setPassword(e.target.value)}/></label>
+            {authMode === "signup" && (
+              <>
+                <label>
+                  আপনার নাম
+                  <input
+                    required
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                  />
+                </label>
+
+                <label>
+                  মোবাইল নম্বর
+                  <input
+                    value={mobile}
+                    onChange={e => setMobile(e.target.value)}
+                    placeholder="01XXXXXXXXX"
+                  />
+                </label>
+              </>
+            )}
+
+            <label>
+              ইমেইল
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </label>
+
+            <label>
+              পাসওয়ার্ড
+              <input
+                type="password"
+                minLength="6"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+            </label>
+
             <button className="primary full" disabled={busy}>
-              {busy ? "অপেক্ষা করুন..." : authMode === "login" ? "লগইন" : "রেজিস্ট্রেশন"}
+              {busy
+                ? "অপেক্ষা করুন..."
+                : authMode === "login" ? "লগইন" : "রেজিস্ট্রেশন"}
             </button>
           </form>
-          <button className="text-button" onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}>
-            {authMode === "login" ? "নতুন অ্যাকাউন্ট খুলুন" : "আগে থেকেই অ্যাকাউন্ট আছে? লগইন"}
+
+          <button
+            className="text-button"
+            onClick={() =>
+              setAuthMode(authMode === "login" ? "signup" : "login")
+            }
+          >
+            {authMode === "login"
+              ? "নতুন অ্যাকাউন্ট খুলুন"
+              : "আগে থেকেই অ্যাকাউন্ট আছে? লগইন"}
           </button>
         </section>
       )}
@@ -832,7 +1009,9 @@ export default function App() {
           {!session ? (
             <div className="empty">
               <h2>ড্যাশবোর্ড দেখতে লগইন করুন</h2>
-              <button className="primary" onClick={() => goTo("account")}>লগইন</button>
+              <button className="primary" onClick={() => goTo("account")}>
+                লগইন
+              </button>
             </div>
           ) : (
             <>
@@ -843,23 +1022,74 @@ export default function App() {
               </div>
 
               <div className="feature-grid">
-                <div className="feature-card"><User/><h3>নাম</h3><p>{profile?.full_name || session.user.user_metadata?.full_name || "নাম দেওয়া হয়নি"}</p></div>
-                <div className="feature-card"><Bell/><h3>ইমেইল</h3><p>{session.user.email}</p></div>
-                <div className="feature-card"><Smartphone/><h3>মোবাইল নম্বর</h3><p>{profile?.mobile || session.user.user_metadata?.mobile || "মোবাইল দেওয়া হয়নি"}</p></div>
-                <div className="feature-card"><ShieldCheck/><h3>অ্যাকাউন্টের ধরন</h3><p>{isAdmin ? "Admin" : "সাধারণ সদস্য"}</p></div>
+                <div className="feature-card">
+                  <User/>
+                  <h3>নাম</h3>
+                  <p>
+                    {profile?.full_name ||
+                      session.user.user_metadata?.full_name ||
+                      "নাম দেওয়া হয়নি"}
+                  </p>
+                </div>
+
+                <div className="feature-card">
+                  <Bell/>
+                  <h3>ইমেইল</h3>
+                  <p>{session.user.email}</p>
+                </div>
+
+                <div className="feature-card">
+                  <Smartphone/>
+                  <h3>মোবাইল নম্বর</h3>
+                  <p>
+                    {profile?.mobile ||
+                      session.user.user_metadata?.mobile ||
+                      "মোবাইল দেওয়া হয়নি"}
+                  </p>
+                </div>
+
+                <div className="feature-card">
+                  <ShieldCheck/>
+                  <h3>অ্যাকাউন্টের ধরন</h3>
+                  <p>{isAdmin ? "Admin" : "সাধারণ সদস্য"}</p>
+                </div>
               </div>
 
               <div className="admin-grid" style={{ marginTop: 20 }}>
                 <div className="panel">
                   <h3>প্রোফাইল আপডেট</h3>
+
                   <form onSubmit={saveProfile}>
-                    <label>আপনার নাম
-                      <input required value={profileForm.full_name} onChange={e => setProfileForm({ ...profileForm, full_name: e.target.value })}/>
+                    <label>
+                      আপনার নাম
+                      <input
+                        required
+                        value={profileForm.full_name}
+                        onChange={e =>
+                          setProfileForm({
+                            ...profileForm,
+                            full_name: e.target.value
+                          })
+                        }
+                      />
                     </label>
-                    <label>মোবাইল নম্বর
-                      <input value={profileForm.mobile} onChange={e => setProfileForm({ ...profileForm, mobile: e.target.value })}/>
+
+                    <label>
+                      মোবাইল নম্বর
+                      <input
+                        value={profileForm.mobile}
+                        onChange={e =>
+                          setProfileForm({
+                            ...profileForm,
+                            mobile: e.target.value
+                          })
+                        }
+                      />
                     </label>
-                    <button className="primary full" disabled={busy}><Save size={16}/> তথ্য সংরক্ষণ</button>
+
+                    <button className="primary full" disabled={busy}>
+                      <Save size={16}/> তথ্য সংরক্ষণ
+                    </button>
                   </form>
                 </div>
 
@@ -867,9 +1097,27 @@ export default function App() {
                   <h3>আমার অ্যাকাউন্ট</h3>
                   <p>মোট অর্ডার: {orders.length}</p>
                   <p>Firmware Request: নিজের প্রয়োজনীয় Firmware চাইতে পারবেন।</p>
-                  <button className="outline full" onClick={() => goTo("orders")}>আমার অর্ডার দেখুন</button>
-                  <button className="outline full" onClick={() => goTo("request")}>Firmware Request করুন</button>
-                  <button className="outline full" onClick={() => goTo("reseller")}>Reseller আবেদন</button>
+
+                  <button
+                    className="outline full"
+                    onClick={() => goTo("orders")}
+                  >
+                    আমার অর্ডার দেখুন
+                  </button>
+
+                  <button
+                    className="outline full"
+                    onClick={() => goTo("request")}
+                  >
+                    Firmware Request করুন
+                  </button>
+
+                  <button
+                    className="outline full"
+                    onClick={() => goTo("reseller")}
+                  >
+                    Reseller আবেদন
+                  </button>
                 </div>
               </div>
             </>
@@ -880,23 +1128,62 @@ export default function App() {
       {tab === "request" && (
         <section className="section page-section">
           <div className="section-title">
-            <div className="eyebrow"><FileQuestion size={15}/> FIRMWARE REQUEST</div>
+            <div className="eyebrow">
+              <FileQuestion size={15}/> FIRMWARE REQUEST
+            </div>
             <h2>আপনার প্রয়োজনীয় Firmware Request করুন</h2>
             <p>আপনার ফোনের ব্র্যান্ড ও মডেল লিখে Request জমা দিন।</p>
           </div>
 
           <div className="panel narrow">
             <form onSubmit={submitFirmwareRequest}>
-              <label>ফোনের ব্র্যান্ড
-                <input required value={requestForm.brand} onChange={e => setRequestForm({ ...requestForm, brand: e.target.value })} placeholder="যেমন Samsung"/>
+              <label>
+                ফোনের ব্র্যান্ড
+                <input
+                  required
+                  value={requestForm.brand}
+                  onChange={e =>
+                    setRequestForm({
+                      ...requestForm,
+                      brand: e.target.value
+                    })
+                  }
+                  placeholder="যেমন Samsung"
+                />
               </label>
-              <label>ফোনের মডেল
-                <input required value={requestForm.model} onChange={e => setRequestForm({ ...requestForm, model: e.target.value })} placeholder="যেমন Galaxy A12"/>
+
+              <label>
+                ফোনের মডেল
+                <input
+                  required
+                  value={requestForm.model}
+                  onChange={e =>
+                    setRequestForm({
+                      ...requestForm,
+                      model: e.target.value
+                    })
+                  }
+                  placeholder="যেমন Galaxy A12"
+                />
               </label>
-              <label>অতিরিক্ত তথ্য
-                <textarea value={requestForm.details} onChange={e => setRequestForm({ ...requestForm, details: e.target.value })} placeholder="Firmware version বা সমস্যার বিবরণ"/>
+
+              <label>
+                অতিরিক্ত তথ্য
+                <textarea
+                  value={requestForm.details}
+                  onChange={e =>
+                    setRequestForm({
+                      ...requestForm,
+                      details: e.target.value
+                    })
+                  }
+                  placeholder="Firmware version বা সমস্যার বিবরণ"
+                />
               </label>
-              <button className="primary full" disabled={busy}><Send size={16}/> Request জমা দিন</button>
+
+              <button className="primary full" disabled={busy}>
+                <Send size={16}/> Request জমা দিন
+              </button>
             </form>
           </div>
         </section>
@@ -905,7 +1192,9 @@ export default function App() {
       {tab === "reseller" && (
         <section className="section page-section">
           <div className="section-title">
-            <div className="eyebrow"><Store size={15}/> RESELLER PROGRAM</div>
+            <div className="eyebrow">
+              <Store size={15}/> RESELLER PROGRAM
+            </div>
             <h2>GSMPLUS Reseller আবেদন</h2>
             <p>Reseller হওয়ার আগ্রহ জানাতে আবেদন জমা দিন।</p>
           </div>
@@ -916,21 +1205,59 @@ export default function App() {
                 <h3>আপনার আবেদন জমা আছে</h3>
                 <p>ব্যবসার নাম: {myApplication.business_name || "উল্লেখ করা হয়নি"}</p>
                 <p>মোবাইল: {myApplication.mobile}</p>
-                <p>স্ট্যাটাস: <span className="tag">{statusText(myApplication.status)}</span></p>
-                <p className="muted">অ্যাডমিন আপনার আবেদন পর্যালোচনা করবেন।</p>
+                <p>
+                  স্ট্যাটাস:
+                  <span className="tag">{statusText(myApplication.status)}</span>
+                </p>
+                <p className="muted">
+                  অ্যাডমিন আপনার আবেদন পর্যালোচনা করবেন।
+                </p>
               </>
             ) : (
               <form onSubmit={submitResellerApplication}>
-                <label>ব্যবসা বা দোকানের নাম
-                  <input value={resellerForm.business_name} onChange={e => setResellerForm({ ...resellerForm, business_name: e.target.value })}/>
+                <label>
+                  ব্যবসা বা দোকানের নাম
+                  <input
+                    value={resellerForm.business_name}
+                    onChange={e =>
+                      setResellerForm({
+                        ...resellerForm,
+                        business_name: e.target.value
+                      })
+                    }
+                  />
                 </label>
-                <label>মোবাইল নম্বর
-                  <input required value={resellerForm.mobile} onChange={e => setResellerForm({ ...resellerForm, mobile: e.target.value })}/>
+
+                <label>
+                  মোবাইল নম্বর
+                  <input
+                    required
+                    value={resellerForm.mobile}
+                    onChange={e =>
+                      setResellerForm({
+                        ...resellerForm,
+                        mobile: e.target.value
+                      })
+                    }
+                  />
                 </label>
-                <label>আপনার সম্পর্কে
-                  <textarea value={resellerForm.message} onChange={e => setResellerForm({ ...resellerForm, message: e.target.value })}/>
+
+                <label>
+                  আপনার সম্পর্কে
+                  <textarea
+                    value={resellerForm.message}
+                    onChange={e =>
+                      setResellerForm({
+                        ...resellerForm,
+                        message: e.target.value
+                      })
+                    }
+                  />
                 </label>
-                <button className="primary full" disabled={busy}><Send size={16}/> আবেদন জমা দিন</button>
+
+                <button className="primary full" disabled={busy}>
+                  <Send size={16}/> আবেদন জমা দিন
+                </button>
               </form>
             )}
           </div>
@@ -940,30 +1267,50 @@ export default function App() {
       {tab === "orders" && (
         <section className="section page-section">
           <div className="section-head">
-            <div><div className="eyebrow">ACCOUNT CENTER</div><h2>আমার অর্ডার</h2></div>
-            <button className="outline" onClick={loadProfileAndOrders}><RefreshCw size={15}/> রিফ্রেশ</button>
+            <div>
+              <div className="eyebrow">ACCOUNT CENTER</div>
+              <h2>আমার অর্ডার</h2>
+            </div>
+
+            <button className="outline" onClick={loadProfileAndOrders}>
+              <RefreshCw size={15}/> রিফ্রেশ
+            </button>
           </div>
 
           {!session ? (
             <div className="empty">
               অর্ডার দেখতে লগইন করুন।
-              <button className="primary" onClick={() => goTo("account")}>লগইন</button>
+              <button className="primary" onClick={() => goTo("account")}>
+                লগইন
+              </button>
             </div>
           ) : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Firmware</th><th>পরিমাণ</th><th>স্ট্যাটাস</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Firmware</th>
+                    <th>পরিমাণ</th>
+                    <th>স্ট্যাটাস</th>
+                  </tr>
+                </thead>
+
                 <tbody>
                   {orders.map(o => (
                     <tr key={o.id}>
                       <td>{o.firmwares?.title || "Firmware"}</td>
                       <td>{money(o.amount)}</td>
-                      <td><span className="tag">{statusText(o.status)}</span></td>
+                      <td>
+                        <span className="tag">{statusText(o.status)}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {!orders.length && <p className="empty">এখনো কোনো অর্ডার নেই।</p>}
+
+              {!orders.length && (
+                <p className="empty">এখনো কোনো অর্ডার নেই।</p>
+              )}
             </div>
           )}
         </section>
@@ -972,8 +1319,14 @@ export default function App() {
       {tab === "admin" && isAdmin && (
         <section className="section page-section">
           <div className="section-head">
-            <div><div className="eyebrow">CONTROL CENTER</div><h2>Admin Dashboard</h2></div>
-            <span className="admin-pill"><ShieldCheck size={16}/> ADMIN</span>
+            <div>
+              <div className="eyebrow">CONTROL CENTER</div>
+              <h2>Admin Dashboard</h2>
+            </div>
+
+            <span className="admin-pill">
+              <ShieldCheck size={16}/> ADMIN
+            </span>
           </div>
 
           <div className="stats">
@@ -985,26 +1338,160 @@ export default function App() {
 
           <div className="admin-grid" style={{ marginTop: 20 }}>
             <div className="panel">
-              <h3>নতুন Firmware আপলোড</h3>
+              <h3>নতুন Firmware যোগ করুন</h3>
+
               <form onSubmit={addFirmware}>
-                <label>Firmware নাম<input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}/></label>
-                <label>ব্র্যান্ড<input required value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })}/></label>
-                <label>মডেল<input required value={form.model} onChange={e => setForm({ ...form, model: e.target.value })}/></label>
-                <label>ভার্সন<input value={form.version} onChange={e => setForm({ ...form, version: e.target.value })}/></label>
-                <label>বর্ণনা<textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}/></label>
-                <label className="check"><input type="checkbox" checked={form.is_free} onChange={e => setForm({ ...form, is_free: e.target.checked })}/> Free Firmware</label>
-                {!form.is_free && <label>মূল্য (৳)<input type="number" min="0" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })}/></label>}
-                <label>Firmware ফাইল<input type="file" required onChange={e => setFile(e.target.files?.[0] || null)}/></label>
-                <button className="primary full" disabled={busy}><Upload size={16}/> {busy ? "আপলোড হচ্ছে..." : "আপলোড করুন"}</button>
+                <label>
+                  Firmware নাম
+                  <input
+                    required
+                    value={form.title}
+                    onChange={e =>
+                      setForm({ ...form, title: e.target.value })
+                    }
+                  />
+                </label>
+
+                <label>
+                  ব্র্যান্ড
+                  <input
+                    required
+                    list="gsmplus-brands"
+                    value={form.brand}
+                    onChange={e =>
+                      setForm({ ...form, brand: e.target.value })
+                    }
+                    placeholder="যেমন Samsung"
+                  />
+                  <datalist id="gsmplus-brands">
+                    {brands.filter(b => b !== "All Brands").map(b => (
+                      <option key={b} value={b}/>
+                    ))}
+                  </datalist>
+                </label>
+
+                <label>
+                  মডেল
+                  <input
+                    required
+                    value={form.model}
+                    onChange={e =>
+                      setForm({ ...form, model: e.target.value })
+                    }
+                  />
+                </label>
+
+                <label>
+                  ভার্সন
+                  <input
+                    value={form.version}
+                    onChange={e =>
+                      setForm({ ...form, version: e.target.value })
+                    }
+                  />
+                </label>
+
+                <label>
+                  বর্ণনা
+                  <textarea
+                    value={form.description}
+                    onChange={e =>
+                      setForm({ ...form, description: e.target.value })
+                    }
+                  />
+                </label>
+
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={form.is_free}
+                    onChange={e =>
+                      setForm({
+                        ...form,
+                        is_free: e.target.checked
+                      })
+                    }
+                  />
+                  Free Firmware
+                </label>
+
+                {!form.is_free && (
+                  <label>
+                    মূল্য (৳)
+                    <input
+                      type="number"
+                      min="0"
+                      value={form.price}
+                      onChange={e =>
+                        setForm({ ...form, price: e.target.value })
+                      }
+                    />
+                  </label>
+                )}
+
+                <label>
+                  <Link2 size={15}/> Firmware Download Link
+                  <input
+                    type="url"
+                    required
+                    placeholder="https://drive.google.com/..."
+                    value={form.download_url}
+                    onChange={e =>
+                      setForm({
+                        ...form,
+                        download_url: e.target.value
+                      })
+                    }
+                  />
+                </label>
+
+                <small>
+                  Google Drive, Mega অথবা অন্য HTTPS Download Link দিন।
+                  লিংকটি ব্যবহারকারীদের জন্য Access চালু থাকতে হবে।
+                </small>
+
+                <button className="primary full" disabled={busy}>
+                  <Upload size={16}/>
+                  {busy ? "যোগ হচ্ছে..." : "Firmware যোগ করুন"}
+                </button>
               </form>
             </div>
 
             <div className="panel">
               <h3>নতুন Announcement</h3>
+
               <form onSubmit={publishAnnouncement}>
-                <label>শিরোনাম<input required value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })}/></label>
-                <label>বিস্তারিত<textarea required value={announcementForm.content} onChange={e => setAnnouncementForm({ ...announcementForm, content: e.target.value })}/></label>
-                <button className="primary full" disabled={busy}><Send size={16}/> প্রকাশ করুন</button>
+                <label>
+                  শিরোনাম
+                  <input
+                    required
+                    value={announcementForm.title}
+                    onChange={e =>
+                      setAnnouncementForm({
+                        ...announcementForm,
+                        title: e.target.value
+                      })
+                    }
+                  />
+                </label>
+
+                <label>
+                  বিস্তারিত
+                  <textarea
+                    required
+                    value={announcementForm.content}
+                    onChange={e =>
+                      setAnnouncementForm({
+                        ...announcementForm,
+                        content: e.target.value
+                      })
+                    }
+                  />
+                </label>
+
+                <button className="primary full" disabled={busy}>
+                  <Send size={16}/> প্রকাশ করুন
+                </button>
               </form>
             </div>
           </div>
@@ -1012,71 +1499,145 @@ export default function App() {
           <div className="panel" style={{ marginTop: 20 }}>
             <div className="section-head">
               <h3>অর্ডার ও পেমেন্ট যাচাই</h3>
-              <button className="outline" onClick={loadAdminData}><RefreshCw size={15}/> রিফ্রেশ</button>
+              <button className="outline" onClick={loadAdminData}>
+                <RefreshCw size={15}/> রিফ্রেশ
+              </button>
             </div>
+
             {orders.map(o => (
               <div className="order-row" key={o.id}>
                 <b>{o.firmwares?.title || "Firmware"}</b>
-                <small>{o.profiles?.email || o.transaction_id || "গ্রাহক"} · {money(o.amount)} · {statusText(o.status)}</small>
+                <small>
+                  {o.profiles?.email || o.transaction_id || "গ্রাহক"}
+                  {" · "}{money(o.amount)}
+                  {" · "}{statusText(o.status)}
+                </small>
+
                 <div>
-                  <button className="approve" onClick={() => updateOrder(o.id, "approved")}>Approve</button>
-                  <button className="reject" onClick={() => updateOrder(o.id, "rejected")}>Reject</button>
+                  <button
+                    className="approve"
+                    onClick={() => updateOrder(o.id, "approved")}
+                  >
+                    Approve
+                  </button>
+
+                  <button
+                    className="reject"
+                    onClick={() => updateOrder(o.id, "rejected")}
+                  >
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
+
             {!orders.length && <p className="empty">এখনো কোনো অর্ডার নেই।</p>}
           </div>
 
           <div className="panel" style={{ marginTop: 20 }}>
             <h3>Firmware Requests</h3>
+
             {requests.map(r => (
               <div className="order-row" key={r.id}>
                 <b>{r.brand} {r.model}</b>
-                <small>{r.details || "অতিরিক্ত তথ্য নেই"} · {statusText(r.status)}</small>
+                <small>
+                  {r.details || "অতিরিক্ত তথ্য নেই"}
+                  {" · "}{statusText(r.status)}
+                </small>
+
                 <div>
-                  <button className="approve" onClick={() => updateRequest(r.id, "approved")}>Approve</button>
-                  <button className="reject" onClick={() => updateRequest(r.id, "rejected")}>Reject</button>
+                  <button
+                    className="approve"
+                    onClick={() => updateRequest(r.id, "approved")}
+                  >
+                    Approve
+                  </button>
+
+                  <button
+                    className="reject"
+                    onClick={() => updateRequest(r.id, "rejected")}
+                  >
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
+
             {!requests.length && <p className="empty">কোনো Request নেই।</p>}
           </div>
 
           <div className="panel" style={{ marginTop: 20 }}>
             <h3>Reseller Applications</h3>
+
             {applications.map(a => (
               <div className="order-row" key={a.id}>
                 <b>{a.business_name || "ব্যবসার নাম দেওয়া হয়নি"}</b>
-                <small>{a.mobile} · {a.message || "বিস্তারিত নেই"} · {statusText(a.status)}</small>
+                <small>
+                  {a.mobile} · {a.message || "বিস্তারিত নেই"}
+                  {" · "}{statusText(a.status)}
+                </small>
+
                 <div>
-                  <button className="approve" onClick={() => updateApplication(a.id, "approved")}>Approve</button>
-                  <button className="reject" onClick={() => updateApplication(a.id, "rejected")}>Reject</button>
+                  <button
+                    className="approve"
+                    onClick={() => updateApplication(a.id, "approved")}
+                  >
+                    Approve
+                  </button>
+
+                  <button
+                    className="reject"
+                    onClick={() => updateApplication(a.id, "rejected")}
+                  >
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
+
             {!applications.length && <p className="empty">কোনো আবেদন নেই।</p>}
           </div>
 
           <div className="panel" style={{ marginTop: 20 }}>
             <h3>Announcements পরিচালনা</h3>
+
             {announcements.map(a => (
               <div className="order-row" key={a.id}>
                 <b>{a.title}</b>
                 <small>{a.content}</small>
+
                 <div>
-                  <button className="reject" onClick={() => deleteAnnouncement(a.id)}>মুছুন</button>
+                  <button
+                    className="reject"
+                    onClick={() => deleteAnnouncement(a.id)}
+                  >
+                    মুছুন
+                  </button>
                 </div>
               </div>
             ))}
+
             {!announcements.length && <p className="empty">কোনো Announcement নেই।</p>}
           </div>
         </section>
       )}
 
       {selected && (
-        <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="detail-modal" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelected(null)}><X/></button>
+        <div
+          className="modal-backdrop"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="detail-modal"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              className="modal-close"
+              onClick={() => setSelected(null)}
+            >
+              <X/>
+            </button>
+
             <div className="eyebrow">FIRMWARE DETAILS</div>
             <h2>{selected.title}</h2>
             <p><b>Brand:</b> {selected.brand}</p>
@@ -1084,11 +1645,17 @@ export default function App() {
             <p><b>Version:</b> {selected.version}</p>
             <p><b>Type:</b> {selected.is_free ? "Free" : "Premium"}</p>
             <p>{selected.description}</p>
-            <button className="primary full" onClick={() => {
-              const firmware = selected;
-              setSelected(null);
-              downloadFirmware(firmware);
-            }}>Download <Download size={16}/></button>
+
+            <button
+              className="primary full"
+              onClick={() => {
+                const firmware = selected;
+                setSelected(null);
+                downloadFirmware(firmware);
+              }}
+            >
+              Download <Download size={16}/>
+            </button>
           </div>
         </div>
       )}
@@ -1098,7 +1665,9 @@ export default function App() {
           <span className="brand-icon"><Smartphone size={20}/></span>
           <b>GSM<span className="accent">PLUS</span></b>
         </div>
+
         <p>© {new Date().getFullYear()} GSMPLUS. All rights reserved.</p>
+        <small>Admin: GSMSUMON</small>
         <small>Firmware files are provided for legitimate device servicing only.</small>
         <small>Payment gateways are not active. Do not send money.</small>
       </footer>
@@ -1113,7 +1682,10 @@ function SetupScreen() {
         <div className="brand-icon"><Smartphone size={25}/></div>
         <h1>GSM<span className="accent">PLUS</span></h1>
         <h2>Supabase সংযোগ বাকি</h2>
-        <p>Netlify Environment Variables-এ VITE_SUPABASE_URL এবং VITE_SUPABASE_ANON_KEY সঠিকভাবে যোগ করুন।</p>
+        <p>
+          Netlify Environment Variables-এ VITE_SUPABASE_URL এবং
+          VITE_SUPABASE_ANON_KEY সঠিকভাবে যোগ করুন।
+        </p>
       </div>
     </div>
   );
